@@ -1,0 +1,14 @@
+{
+  "tarifa": { "base": 2.5, "por_km": 1.1, "minimo": 5.0 },
+  "suplementos": {
+    "aeropuerto_T4": 5.0,
+    "nocturno_22_06": 2.0,
+    "evento_BER": 2.0
+  },
+  "velocidad_kmh": 25.0,
+  "bbox_madrid": { "lat_min": 40.33, "lat_max": 40.52, "lon_min": -3.75, "lon_max": -3.56 },
+  "radio_pasajero_cerca_conductor_m": 1200,
+  "intervalo_medio_solicitudes_s": 25,
+  "escala_tiempo": 288,
+  "duracion_dia_real_seg": 300
+}

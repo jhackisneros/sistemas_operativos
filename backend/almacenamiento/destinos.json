@@ -1,0 +1,7 @@
+[
+  { "id": "RET", "nombre": "Parque de El Retiro", "lat": 40.4153, "lon": -3.6844 },
+  { "id": "BER", "nombre": "Estadio Santiago Bernabéu", "lat": 40.4531, "lon": -3.6883 },
+  { "id": "CDC", "nombre": "Casa de Campo (Lago)", "lat": 40.4170, "lon": -3.7450 },
+  { "id": "MAT", "nombre": "Matadero Madrid", "lat": 40.3910, "lon": -3.6980 },
+  { "id": "T4",  "nombre": "Aeropuerto Adolfo Suárez (T4)", "lat": 40.4920, "lon": -3.5930 }
+]
