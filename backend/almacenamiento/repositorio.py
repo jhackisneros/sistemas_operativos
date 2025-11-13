@@ -2,10 +2,6 @@
 import json
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime, date
-import asyncio
-
-# Notificaciones WS (eventos en tiempo real)
-from eventos.ws import notificar_inicio, notificar_finalizacion
 
 from .locks import (
     lock_solicitudes, lock_taxis, lock_liquidacion,
@@ -155,7 +151,6 @@ class Repositorio:
             vj.estado = EstadoViaje.ASIGNADO
             vj.asignado_en = ts or datetime.utcnow()
             self.viajes[viaje_id] = vj
-        # La notificación de ASIGNACIÓN se hace en el monitor (asignador) tras llamar a este método.
 
     def marcar_inicio_viaje(self, viaje_id: str, ts: datetime | None = None) -> None:
         with lock_viaje[viaje_id]:
@@ -163,17 +158,10 @@ class Repositorio:
             vj.estado = EstadoViaje.EN_CURSO
             vj.iniciado_en = ts or datetime.utcnow()
             self.viajes[viaje_id] = vj
-        # 🔔 WS: notificar inicio (no bloquea el hilo actual)
-        try:
-            asyncio.get_running_loop().create_task(notificar_inicio(viaje_id))
-        except RuntimeError:
-            # Si no hay loop (muy raro en FastAPI), ignoramos silenciosamente
-            pass
 
     def marcar_fin_viaje(self, viaje_id: str, ts: datetime | None = None) -> None:
         """
-        Finaliza el viaje, suma la ganancia diaria al conductor (del taxi asignado)
-        y libera el taxi a LIBRE. Además, emite evento WS de finalización.
+        Finaliza el viaje y suma la ganancia diaria al conductor (del taxi asignado).
         """
         with lock_viaje[viaje_id]:
             vj = self.viajes[viaje_id]
@@ -181,7 +169,7 @@ class Repositorio:
             vj.finalizado_en = ts or datetime.utcnow()
             self.viajes[viaje_id] = vj
 
-        # actualizar ganancias del conductor y liberar taxi
+        # actualizar ganancias del conductor
         if vj.taxi_id:
             taxi = self.taxis[vj.taxi_id]
             c = self.conductores[taxi.conductor_id]
@@ -191,12 +179,6 @@ class Repositorio:
 
             # liberar taxi
             self.actualizar_estado_taxi(taxi.id, EstadoTaxi.LIBRE)
-
-        # 🔔 WS: notificar finalización (no bloquea)
-        try:
-            asyncio.get_running_loop().create_task(notificar_finalizacion(viaje_id))
-        except RuntimeError:
-            pass
 
     def listar_viajes_conductor(self, conductor_id: str) -> List[Viaje]:
         taxi = self.obtener_taxi_por_conductor(conductor_id)

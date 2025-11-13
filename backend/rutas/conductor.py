@@ -1,11 +1,9 @@
 # backend/rutas/conductor.py
 from fastapi import APIRouter, HTTPException
-from almacenamiento.repositorio import Repositorio
-from dominio.modelos import Conductor, EstadoConductor, EstadoTaxi, EstadoViaje
-from dominio.reglas import aprobar_o_rechazar_conductor
-
-# (Opcional) simulador de generación automática de pasajeros
-from concurrencia.generador_auto_conductor import GeneradorAutoConductor
+from backend.almacenamiento.repositorio import Repositorio
+from backend.dominio.modelos import Conductor, EstadoConductor, EstadoTaxi, EstadoViaje
+from backend.dominio.reglas import aprobar_o_rechazar_conductor
+from backend.concurrencia.generador_auto_conductor import GeneradorAutoConductor
 
 router = APIRouter()
 repo = Repositorio.instancia()
@@ -23,10 +21,6 @@ def registrar(
     lat: float,
     lon: float,
 ):
-    """
-    Registra un conductor y su taxi. Aplica la regla de verificación (antecedentes/licencia).
-    Si queda APROBADO se crea el taxi. Si RECHAZADO, se informa el motivo.
-    """
     c = Conductor(
         id=conductor_id,
         nombre=nombre,
@@ -49,10 +43,6 @@ def registrar(
 
 @router.post("/online")
 def online(conductor_id: str, lat: float, lon: float):
-    """
-    Pone al conductor ONLINE y su taxi a LIBRE con esa ubicación.
-    Activa el generador automático de pasajeros alrededor del conductor.
-    """
     c = repo.obtener_conductor(conductor_id)
     if not c:
         raise HTTPException(404, "Conductor no encontrado")
@@ -63,22 +53,16 @@ def online(conductor_id: str, lat: float, lon: float):
     c.estado = EstadoConductor.ONLINE
     repo.guardar_conductor(c)
 
-    # Taxi a LIBRE en esa ubicación
     t = repo.obtener_taxi_por_conductor(conductor_id)
     if not t:
         raise HTTPException(409, "Conductor sin taxi registrado")
     repo.actualizar_estado_taxi(t.id, EstadoTaxi.LIBRE, ubicacion=(lat, lon))
 
-    # Activar generador automático
     spawner.iniciar(conductor_id)
-
     return {"estado": "ONLINE", "taxi_id": t.id}
 
 @router.post("/offline")
 def offline(conductor_id: str):
-    """
-    Conductor pasa a OFFLINE, taxi a FUERA y detiene el generador automático.
-    """
     c = repo.obtener_conductor(conductor_id)
     if not c:
         raise HTTPException(404, "Conductor no encontrado")
@@ -95,10 +79,6 @@ def offline(conductor_id: str):
 
 @router.post("/iniciar/{viaje_id}")
 def iniciar_viaje(viaje_id: str, conductor_id: str):
-    """
-    El conductor inicia un viaje ASIGNADO para su taxi.
-    (En la simulación real, esto lo hace el bucle del conductor; aquí lo exponemos como endpoint).
-    """
     v = repo.obtener_viaje(viaje_id)
     if not v:
         raise HTTPException(404, "Viaje no encontrado")
@@ -112,9 +92,6 @@ def iniciar_viaje(viaje_id: str, conductor_id: str):
 
 @router.post("/finalizar/{viaje_id}")
 def finalizar_viaje(viaje_id: str, conductor_id: str):
-    """
-    El conductor finaliza un viaje EN_CURSO, suma ganancias diarias y libera el taxi.
-    """
     v = repo.obtener_viaje(viaje_id)
     if not v:
         raise HTTPException(404, "Viaje no encontrado")

@@ -3,17 +3,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Rutas HTTP
-from rutas import comunes, pasajero, conductor, admin
+from backend.rutas import comunes, pasajero, conductor, admin
 # Rutas WebSocket
-from eventos import ws as eventos_ws
+from backend.eventos import ws as eventos_ws
 
 # Concurrencia (monitores/daemons)
-from concurrencia.asignador import iniciar_asignador
-from concurrencia.liquidacion import iniciar_daemon_liquidacion, detener_daemon_liquidacion
+from backend.concurrencia.asignador import iniciar_asignador
+from backend.concurrencia.liquidacion import (
+    iniciar_daemon_liquidacion,
+    detener_daemon_liquidacion,
+)
 
 # Estado compartido / “BD” en memoria
-from almacenamiento.repositorio import Repositorio
-from almacenamiento.semillas import cargar_semillas
+from backend.almacenamiento.repositorio import Repositorio
+from backend.almacenamiento.semillas import cargar_semillas
 
 
 def crear_app() -> FastAPI:
@@ -48,7 +51,7 @@ def crear_app() -> FastAPI:
         # Cargar catálogos y configuración
         repo.cargar_destinos()
         repo.cargar_config()
-        # (opcional) semillas de demo
+        # Semillas de demo (opcional)
         try:
             cargar_semillas()
         except Exception as e:
@@ -80,7 +83,6 @@ def crear_app() -> FastAPI:
 # Instancia para Uvicorn: `uvicorn backend.app:app --reload`
 app = crear_app()
 
-# Ejecución directa: `python backend/app.py`
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app:app", host="0.0.0.0", port=8000, reload=True)
