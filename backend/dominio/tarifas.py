@@ -1,52 +1,47 @@
 # backend/dominio/tarifas.py
+from typing import Tuple, Dict
 from datetime import datetime
-from typing import Tuple, Dict, Any
-from .geo import haversine_km
+from backend.dominio.geo import haversine_km
 
 
 def calcular_tarifa(
     origen: Tuple[float, float],
-    destino_latlon: Tuple[float, float],
-    cfg: Dict[str, Any],
+    destino: Tuple[float, float],
+    cfg: Dict,
 ) -> float:
     """
-    Tarifa = max( base + por_km * distancia_km , minimo )
+    Tarifa base + km. Si cfg está vacío, se usan valores por defecto.
     """
-    tcfg = cfg.get("tarifa", {})
-    base = float(tcfg.get("base", 2.5))
-    por_km = float(tcfg.get("por_km", 1.1))
-    minimo = float(tcfg.get("minimo", 5.0))
+    tarifa_base = cfg.get("tarifa_base", 3.0)
+    precio_km = cfg.get("precio_km", 1.2)
 
-    km = haversine_km(origen, destino_latlon)
-    tarifa = base + por_km * km
-    if tarifa < minimo:
-        tarifa = minimo
-    return round(tarifa, 2)
+    km = haversine_km(origen, destino)
+    return tarifa_base + precio_km * km
 
 
 def aplicar_suplementos(
     destino_id: str,
-    when: datetime,
-    cfg: Dict[str, Any],
+    cuando: datetime,
+    cfg: Dict,
     evento_ber: bool = False,
 ) -> float:
     """
-    Suplementos:
-      - Aeropuerto (destino_id == 'T4')
-      - Nocturno (22–06)
-      - Evento Bernabéu (si evento_ber True y destino BER)
+    Aplica suplementos sencillos:
+      - nocturno (22:00–6:00)
+      - especial T4
     """
-    scfg = cfg.get("suplementos", {})
+    hora = cuando.hour
+    suplemento_nocturno = cfg.get("suplemento_nocturno", 1.0)
+    suplemento_t4 = cfg.get("suplemento_t4", 5.0)
+
     total = 0.0
 
+    # nocturno
+    if hora >= 22 or hora < 6:
+        total += suplemento_nocturno
+
+    # aeropuerto T4
     if destino_id == "T4":
-        total += float(scfg.get("aeropuerto_T4", 5.0))
+        total += suplemento_t4
 
-    h = when.hour
-    if h >= 22 or h < 6:
-        total += float(scfg.get("nocturno_22_06", 2.0))
-
-    if destino_id == "BER" and evento_ber:
-        total += float(scfg.get("evento_BER", 2.0))
-
-    return round(total, 2)
+    return total

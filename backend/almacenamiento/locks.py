@@ -1,12 +1,12 @@
 # backend/almacenamiento/locks.py
-from threading import RLock
+import threading
 from collections import defaultdict
 
 # Locks globales
-lock_solicitudes = RLock()   # protege cola_solicitudes
-lock_taxis       = RLock()   # protege estado/ubicación de taxis
-lock_liquidacion = RLock()   # protege proceso de cierre diario y ledger
+lock_solicitudes = threading.Lock()
+lock_taxis = threading.Lock()
+lock_liquidacion = threading.Lock()
 
-# Locks por entidad (se crean bajo demanda)
-lock_conductor = defaultdict(RLock)  # clave = conductor_id
-lock_viaje     = defaultdict(RLock)  # clave = viaje_id
+# Locks por entidad
+lock_conductor = defaultdict(threading.Lock)  # lock_conductor[id_conductor]
+lock_viaje = defaultdict(threading.Lock)      # lock_viaje[id_viaje]

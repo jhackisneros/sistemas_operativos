@@ -1,58 +1,56 @@
 # backend/concurrencia/generador_auto_conductor.py
 import threading
+import time
 import random
-from almacenamiento.repositorio import Repositorio
-from dominio.geo import dispersion_latlon
-from dominio.tiempo_sim import TIEMPO
-from dominio.modelos import EstadoConductor
+from typing import Dict
+
+from backend.almacenamiento.repositorio import Repositorio
+from backend.dominio.geo import dispersion_latlon
+from backend.dominio.tiempo_sim import TIEMPO
+from backend.dominio.modelos import EstadoConductor
 
 
 class GeneradorAutoConductor:
     """
-    Por cada conductor ONLINE, lanza un hilo que:
-      - genera un origen aleatorio cerca del conductor
-      - elige un destino fijo al azar de los 5
-      - calcula precio y crea el viaje (PENDIENTE)
-      - despierta al asignador
+    Para cada conductor ONLINE, genera de vez en cuando pasajeros
+    cercanos de forma automática.
     """
-    def __init__(self, repo: Repositorio):
-        self.repo = repo
-        self._hilos: dict[str, tuple[threading.Thread, threading.Event]] = {}
 
-    def iniciar(self, conductor_id: str):
+    def __init__(self, repo: Repositorio) -> None:
+        self.repo = repo
+        self._hilos: Dict[str, threading.Thread] = {}
+        self._parar: Dict[str, bool] = {}
+
+    def iniciar(self, conductor_id: str) -> None:
         if conductor_id in self._hilos:
             return
-        stop = threading.Event()
-        th = threading.Thread(target=self._loop, args=(conductor_id, stop), daemon=True)
-        self._hilos[conductor_id] = (th, stop)
-        th.start()
 
-    def detener(self, conductor_id: str):
-        if conductor_id in self._hilos:
-            th, stop = self._hilos.pop(conductor_id)
-            stop.set()
+        self._parar[conductor_id] = False
 
-    def _loop(self, conductor_id: str, stop: threading.Event):
-        cfg = self.repo.cfg
-        radius = cfg["radio_pasajero_cerca_conductor_m"]
-        mean_gap = cfg["intervalo_medio_solicitudes_s"]
+        def bucle():
+            while not self._parar[conductor_id]:
+                c = self.repo.obtener_conductor(conductor_id)
+                if not c or c.estado != EstadoConductor.ONLINE:
+                    time.sleep(2)
+                    continue
 
-        while not stop.wait(timeout=random.expovariate(1.0 / mean_gap)):
-            c = self.repo.obtener_conductor(conductor_id)
-            if not c or c.estado != EstadoConductor.ONLINE or not c.ubicacion:
-                continue
+                # destino aleatorio
+                ids_dest = self.repo.listar_ids_destinos()
+                if not ids_dest:
+                    time.sleep(5)
+                    continue
+                dest_id = random.choice(ids_dest)
 
-            # 1) origen alrededor del conductor
-            olat, olon = dispersion_latlon(c.ubicacion[0], c.ubicacion[1], radio_m=radius)
+                origen = dispersion_latlon(c.ubicacion, radio_metros=800)
+                when = TIEMPO.ahora()
+                precio = self.repo.cotizar(origen, dest_id, when)
+                self.repo.crear_viaje(None, origen, dest_id, precio)
+                time.sleep(5)  # cada 5s crea un potencial viaje
 
-            # 2) destino al azar
-            dest_id = random.choice(self.repo.listar_ids_destinos())
+        t = threading.Thread(target=bucle, daemon=True)
+        self._hilos[conductor_id] = t
+        t.start()
 
-            # 3) precio/ETA
-            when = TIEMPO.ahora()
-            precio = self.repo.cotizar((olat, olon), dest_id, when)
-
-            # 4) crear viaje y notificar
-            vj = self.repo.crear_viaje(None, (olat, olon), dest_id, precio)
-            if self.repo.asignador:
-                self.repo.asignador.submit(vj.id)
+    def detener(self, conductor_id: str) -> None:
+        self._parar[conductor_id] = True
+        self._hilos.pop(conductor_id, None)

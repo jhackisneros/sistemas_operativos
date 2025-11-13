@@ -4,17 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Rutas HTTP
 from backend.rutas import comunes, pasajero, conductor, admin
-# Rutas WebSocket
+# WebSockets
 from backend.eventos import ws as eventos_ws
 
-# Concurrencia (monitores/daemons)
+# Concurrencia
 from backend.concurrencia.asignador import iniciar_asignador
 from backend.concurrencia.liquidacion import (
     iniciar_daemon_liquidacion,
     detener_daemon_liquidacion,
 )
 
-# Estado compartido / “BD” en memoria
+# Repositorio y semillas
 from backend.almacenamiento.repositorio import Repositorio
 from backend.almacenamiento.semillas import cargar_semillas
 
@@ -26,7 +26,6 @@ def crear_app() -> FastAPI:
         description="Backend de simulación UNIETAXI (concurrencia + liquidación acelerada)",
     )
 
-    # CORS (ajusta allow_origins en producción)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -35,40 +34,33 @@ def crear_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Repositorio singleton
     repo = Repositorio.instancia()
 
-    # Registrar routers HTTP
+    # Routers HTTP
     app.include_router(comunes.router,   prefix="/comunes",   tags=["comunes"])
     app.include_router(pasajero.router,  prefix="/pasajero",  tags=["pasajero"])
     app.include_router(conductor.router, prefix="/conductor", tags=["conductor"])
     app.include_router(admin.router,     prefix="/admin",     tags=["admin"])
-    # Registrar router WebSocket
+    # WebSockets
     app.include_router(eventos_ws.router, tags=["websocket"])
 
     @app.on_event("startup")
     def _startup():
-        # Cargar catálogos y configuración
+        # catálogos / config
         repo.cargar_destinos()
         repo.cargar_config()
-        # Semillas de demo (opcional)
         try:
             cargar_semillas()
         except Exception as e:
             print("[Semillas] Aviso: no se pudieron cargar las semillas:", e)
 
-        # Iniciar monitor de asignación (dispatcher)
         iniciar_asignador(repo)
-
-        # Iniciar daemon de liquidación (cada 5 min reales = 24h simuladas)
         iniciar_daemon_liquidacion(repo)
 
     @app.on_event("shutdown")
     def _shutdown():
-        # Detener daemon de liquidación
         detener_daemon_liquidacion()
 
-    # Endpoints de salud
     @app.get("/", tags=["salud"])
     def raiz():
         return {"ok": True, "servicio": "UNIETAXI", "version": "1.0.0"}
@@ -80,7 +72,6 @@ def crear_app() -> FastAPI:
     return app
 
 
-# Instancia para Uvicorn: `uvicorn backend.app:app --reload`
 app = crear_app()
 
 if __name__ == "__main__":

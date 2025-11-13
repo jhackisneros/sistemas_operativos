@@ -4,27 +4,30 @@ import random
 from typing import Tuple
 
 
-def haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
-    """
-    Distancia Haversine entre dos puntos (lat, lon) en km.
-    """
-    lat1, lon1 = a
-    lat2, lon2 = b
+def haversine_km(origen: Tuple[float, float], destino: Tuple[float, float]) -> float:
+    """Distancia aproximada en km entre dos puntos lat/lon."""
+    lat1, lon1 = origen
+    lat2, lon2 = destino
     R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    la1 = math.radians(lat1)
-    la2 = math.radians(lat2)
-    x = math.sin(dlat / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin(dlon / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(x))
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
-def dispersion_latlon(lat: float, lon: float, radio_m: int = 800) -> Tuple[float, float]:
-    """
-    Devuelve un punto aleatorio alrededor de (lat, lon) dentro de un círculo de 'radio_m' metros.
-    """
-    r = radio_m * math.sqrt(random.random())  # para distribución uniforme en área
-    theta = random.random() * 2 * math.pi
-    dlat = (r * math.cos(theta)) / 111_111.0
-    dlon = (r * math.sin(theta)) / (111_111.0 * math.cos(math.radians(lat)))
+def dispersion_latlon(
+    centro: Tuple[float, float], radio_metros: float = 500.0
+) -> Tuple[float, float]:
+    """Devuelve un punto aleatorio alrededor de 'centro' dentro de un radio en metros."""
+    lat, lon = centro
+    # 1 grado de latitud ~ 111km
+    rad_km = radio_metros / 1000.0
+    dlat = (random.random() - 0.5) * (rad_km / 111.0) * 2
+    dlon = (random.random() - 0.5) * (rad_km / (111.0 * math.cos(math.radians(lat)))) * 2
     return lat + dlat, lon + dlon

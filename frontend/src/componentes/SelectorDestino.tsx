@@ -49,14 +49,12 @@ const DESTINOS_FIJOS: Destino[] = [
 export default function SelectorDestino({ value, onChange }: Props) {
   const [destinos, setDestinos] = useState<Destino[]>([]);
   const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
 
     async function cargar() {
       setCargando(true);
-      setError(null);
       try {
         const desdeApi = await getDestinos();
         if (!cancelado) {
@@ -68,9 +66,8 @@ export default function SelectorDestino({ value, onChange }: Props) {
           }
         }
       } catch (e) {
-        console.error("Error cargando destinos:", e);
+        console.warn("No se pudieron cargar destinos desde el servidor, usando lista fija.");
         if (!cancelado) {
-          setError("No se pudieron cargar los destinos desde el servidor. Usando lista fija.");
           setDestinos(DESTINOS_FIJOS);
         }
       } finally {
@@ -92,12 +89,6 @@ export default function SelectorDestino({ value, onChange }: Props) {
       <label>Destino</label>
 
       {cargando && <p>Cargando destinos...</p>}
-
-      {error && (
-        <p style={{ color: "#f97373", fontSize: 12 }}>
-          {error}
-        </p>
-      )}
 
       <select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Selecciona un destino</option>

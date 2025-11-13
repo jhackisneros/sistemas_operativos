@@ -1,84 +1,73 @@
 # backend/concurrencia/asignador.py
 import threading
-import heapq
-from datetime import datetime
-from typing import List, Tuple
-import asyncio
+import time
+from typing import Optional
 
-from almacenamiento.repositorio import Repositorio
-from dominio.modelos import EstadoTaxi, EstadoViaje
-from eventos.ws import notificar_asignacion
+from backend.almacenamiento.repositorio import Repositorio
+from backend.dominio.modelos import EstadoTaxi, EstadoViaje
 
 
-class AsignadorMonitor:
+class Asignador(threading.Thread):
     """
-    Monitor que empareja solicitudes con taxis libres.
+    Hilo que toma viajes PENDIENTES y los asigna al taxi LIBRE más cercano.
     """
-    def __init__(self, repo: Repositorio):
+
+    def __init__(self, repo: Repositorio, intervalo_seg: float = 1.0) -> None:
+        super().__init__(daemon=True)
         self.repo = repo
-        self._lock = threading.Lock()
-        self._cv = threading.Condition(self._lock)
+        self.intervalo_seg = intervalo_seg
+        self._parar = threading.Event()
 
-    def submit(self, viaje_id: str) -> None:
-        with self._cv:
-            self._cv.notify()
+    def detener(self) -> None:
+        self._parar.set()
 
-    def _candidatos(self, origen: tuple) -> List[Tuple[float, float, str]]:
-        from dominio.geo import haversine_km
-        out = []
-        for taxi_id, taxi in self.repo.taxis.items():
-            if taxi.estado != EstadoTaxi.LIBRE or not taxi.ubicacion:
+    def _buscar_taxi_libre_mas_cercano(self, viaje_id: str) -> Optional[str]:
+        v = self.repo.obtener_viaje(viaje_id)
+        if not v:
+            return None
+        origen = v.origen
+
+        mejor_taxi_id = None
+        mejor_dist = None
+
+        for t in self.repo.taxis.values():
+            if t.estado != EstadoTaxi.LIBRE:
                 continue
-            d = haversine_km(origen, taxi.ubicacion)
-            out.append((d, -taxi.rating, taxi_id))
-        return out
+            dist = self.repo.cfg.get("funcion_distancia", None)
+            # usamos haversine_km directo desde repo
+            from backend.dominio.geo import haversine_km
 
-    def loop(self):
-        while True:
-            with self._cv:
-                while not self.repo.cola_solicitudes:
-                    self._cv.wait(timeout=0.5)
-                viaje_id = self.repo.pop_solicitud()
+            d = haversine_km(origen, t.ubicacion)
+            if mejor_dist is None or d < mejor_dist:
+                mejor_dist = d
+                mejor_taxi_id = t.id
 
-            if not viaje_id:
-                continue
+        return mejor_taxi_id
 
-            vj = self.repo.obtener_viaje(viaje_id)
-            if not vj or vj.estado != EstadoViaje.PENDIENTE:
-                continue
-
-            candidatos = self._candidatos(vj.origen)
-            if not candidatos:
-                with self._cv:
-                    self.repo.push_solicitud(viaje_id)
-                    self._cv.wait(timeout=0.5)
+    def run(self) -> None:
+        while not self._parar.is_set():
+            viaje_id = self.repo.pop_solicitud()
+            if viaje_id is None:
+                time.sleep(self.intervalo_seg)
                 continue
 
-            heapq.heapify(candidatos)
-            _, _, taxi_id = heapq.heappop(candidatos)
-            taxi = self.repo.taxis[taxi_id]
-            if taxi.estado != EstadoTaxi.LIBRE:
-                with self._cv:
-                    self.repo.push_solicitud(viaje_id)
-                continue
-
-            # Actualiza estado
-            self.repo.actualizar_estado_taxi(taxi_id, EstadoTaxi.ASIGNADO)
-            self.repo.marcar_asignado(viaje_id, taxi_id, ts=datetime.utcnow())
-
-            # Notificar evento WS
-            try:
-                asyncio.get_running_loop().create_task(notificar_asignacion(viaje_id))
-            except RuntimeError:
-                pass
+            taxi_id = self._buscar_taxi_libre_mas_cercano(viaje_id)
+            if taxi_id:
+                self.repo.marcar_asignado(viaje_id, taxi_id)
+                # marcamos taxi como OCUPADO
+                self.repo.actualizar_estado_taxi(taxi_id, EstadoTaxi.OCUPADO)
+            else:
+                # no hay taxi, devolvemos el viaje a la cola
+                self.repo.push_solicitud(viaje_id)
+                time.sleep(self.intervalo_seg)
 
 
-def iniciar_asignador(repo: Repositorio) -> AsignadorMonitor:
-    """
-    Inicializa el monitor de asignación en un hilo daemon.
-    """
-    mon = AsignadorMonitor(repo)
-    repo.asignador = mon
-    t = threading.Thread(target=mon.loop, daemon=True)
-    t.start()
-    return mon
+_asignador_global: Optional[Asignador] = None
+
+
+def iniciar_asignador(repo: Repositorio) -> None:
+    global _asignador_global
+    if _asignador_global is None:
+        _asignador_global = Asignador(repo)
+        repo.asignador = _asignador_global
+        _asignador_global.start()

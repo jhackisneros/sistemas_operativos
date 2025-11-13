@@ -1,58 +1,36 @@
 # backend/dominio/modelos.py
+from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, auto
 from typing import Optional, Tuple
-from datetime import datetime, date
+from datetime import datetime
 import uuid
 
 
-class EstadoTaxi(str, Enum):
-    LIBRE = "LIBRE"
-    ASIGNADO = "ASIGNADO"
-    EN_SERVICIO = "EN_SERVICIO"
-    FUERA = "FUERA"
+def nuevo_id() -> str:
+    return uuid.uuid4().hex[:12]
 
 
-class EstadoViaje(str, Enum):
-    PENDIENTE = "PENDIENTE"
-    ASIGNADO = "ASIGNADO"
-    EN_CURSO = "EN_CURSO"
-    FINALIZADO = "FINALIZADO"
-    CANCELADO = "CANCELADO"
+class EstadoConductor(Enum):
+    PENDIENTE = auto()
+    APROBADO = auto()
+    RECHAZADO = auto()
+    ONLINE = auto()
+    OFFLINE = auto()
 
 
-class EstadoConductor(str, Enum):
-    PENDIENTE = "PENDIENTE"
-    RECHAZADO = "RECHAZADO"
-    APROBADO = "APROBADO"
-    OFFLINE = "OFFLINE"
-    ONLINE = "ONLINE"
+class EstadoTaxi(Enum):
+    FUERA = auto()
+    LIBRE = auto()
+    OCUPADO = auto()
 
 
-@dataclass
-class Conductor:
-    id: str
-    nombre: str
-    licencia_ok: bool = False
-    antecedentes_ok: bool = True
-    estado: EstadoConductor = EstadoConductor.PENDIENTE
-    ubicacion: Optional[Tuple[float, float]] = None
-    rating: float = 4.5
-    ganancias_diarias: float = 0.0
-    balance: float = 0.0
-    ultima_liquidacion: Optional[date] = None
-
-
-@dataclass
-class Taxi:
-    id: str
-    conductor_id: str
-    placa: str
-    marca: str
-    modelo: str
-    estado: EstadoTaxi = EstadoTaxi.FUERA
-    ubicacion: Optional[Tuple[float, float]] = None
-    rating: float = 4.5
+class EstadoViaje(Enum):
+    PENDIENTE = auto()
+    ASIGNADO = auto()
+    EN_CURSO = auto()
+    FINALIZADO = auto()
+    CANCELADO = auto()
 
 
 @dataclass
@@ -62,19 +40,38 @@ class Pasajero:
 
 
 @dataclass
+class Conductor:
+    id: str
+    nombre: str
+    licencia_ok: bool
+    antecedentes_ok: bool
+    estado: EstadoConductor = EstadoConductor.PENDIENTE
+    ubicacion: Tuple[float, float] = (40.4168, -3.7038)
+    ganancias_diarias: float = 0.0
+    rating: float = 4.5
+
+
+@dataclass
+class Taxi:
+    id: str
+    conductor_id: str
+    placa: str
+    marca: str
+    modelo: str
+    estado: EstadoTaxi
+    ubicacion: Tuple[float, float]
+    rating: float = 4.5
+
+
+@dataclass
 class Viaje:
     id: str
     pasajero_id: Optional[str]
     taxi_id: Optional[str]
     origen: Tuple[float, float]
     destino_id: str
-    precio: float = 0.0
-    estado: EstadoViaje = EstadoViaje.PENDIENTE
-    creado_en: datetime = field(default_factory=datetime.utcnow)
+    precio: float
+    estado: EstadoViaje
     asignado_en: Optional[datetime] = None
     iniciado_en: Optional[datetime] = None
     finalizado_en: Optional[datetime] = None
-
-
-def nuevo_id() -> str:
-    return uuid.uuid4().hex

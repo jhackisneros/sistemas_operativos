@@ -1,60 +1,48 @@
 # backend/concurrencia/liquidacion.py
 import threading
+import time
 from datetime import date
 
-from almacenamiento.repositorio import Repositorio
-from almacenamiento.locks import lock_liquidacion
+from backend.almacenamiento.repositorio import Repositorio
+from backend.almacenamiento.locks import lock_liquidacion
 
-_stop_event = threading.Event()
-_thread: threading.Thread | None = None
+_daemon_hilo: threading.Thread | None = None
+_detener = threading.Event()
 
 
-def _cerrar_dia(repo: Repositorio):
+def _cerrar_dia(repo: Repositorio) -> None:
     """
-    Cierre diario:
-      - Por cada conductor: 20% empresa, 80% conductor
-      - Resetea ganancias_diarias y agrega asiento al ledger
+    Recorre conductores, aplica 20/80 y resetea ganancias_diarias.
     """
+    hoy = date.today()
     with lock_liquidacion:
-        hoy = date.today()
-        for cid, c in repo.conductores.items():
-            total = float(c.ganancias_diarias)
-            if total <= 0.0:
-                c.ultima_liquidacion = hoy
-                repo.conductores[cid] = c
+        for c in repo.conductores.values():
+            total = c.ganancias_diarias
+            if total <= 0:
                 continue
-            empresa = round(total * 0.20, 2)
-            neto = round(total * 0.80, 2)
-
-            c.balance += neto
+            empresa_20 = total * 0.20
+            conductor_80 = total * 0.80
+            repo.agregar_asiento_ledger(c.id, hoy, total, empresa_20, conductor_80)
             c.ganancias_diarias = 0.0
-            c.ultima_liquidacion = hoy
-            repo.conductores[cid] = c
-
-            repo.agregar_asiento_ledger(
-                conductor_id=cid,
-                fecha=hoy,
-                total_dia=total,
-                empresa_20=empresa,
-                conductor_80=neto,
-            )
-        print("[Liquidación] cierre diario ejecutado")
+            repo.conductores[c.id] = c
 
 
-def _daemon(repo: Repositorio):
-    dur = repo.cfg.get("duracion_dia_real_seg", 300)  # 5 minutos reales por default
-    while not _stop_event.wait(timeout=dur):
+def _daemon(repo: Repositorio, intervalo_seg: float = 300.0) -> None:
+    while not _detener.is_set():
         _cerrar_dia(repo)
+        time.sleep(intervalo_seg)
 
 
-def iniciar_daemon_liquidacion(repo: Repositorio):
-    global _thread
-    if _thread and _thread.is_alive():
+def iniciar_daemon_liquidacion(repo: Repositorio) -> None:
+    global _daemon_hilo
+    if _daemon_hilo is not None:
         return
-    _stop_event.clear()
-    _thread = threading.Thread(target=_daemon, args=(repo,), daemon=True)
-    _thread.start()
+    # para desarrollo, podemos hacer más rápido: cada 30s
+    intervalo = 300.0  # 5 min reales
+    t = threading.Thread(target=_daemon, args=(repo, intervalo), daemon=True)
+    _daemon_hilo = t
+    t.start()
 
 
-def detener_daemon_liquidacion():
-    _stop_event.set()
+def detener_daemon_liquidacion() -> None:
+    _detener.set()

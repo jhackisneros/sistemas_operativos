@@ -1,18 +1,15 @@
 # backend/dominio/reglas.py
-from .modelos import Conductor, EstadoConductor
+from backend.dominio.modelos import Conductor, EstadoConductor
 
 
 def aprobar_o_rechazar_conductor(c: Conductor) -> Conductor:
     """
-    Regla mínima:
-      - Si antecedentes_ok == False -> RECHAZADO
-      - Si licencia_ok == True y sin antecedentes -> APROBADO
-      - En otro caso -> PENDIENTE
+    Regla básica:
+      - Si no tiene licencia_ok o antecedentes_ok = False → RECHAZADO
+      - Si todo ok → APROBADO (luego podrá ponerse ONLINE/OFFLINE)
     """
-    if not c.antecedentes_ok:
+    if not c.licencia_ok or not c.antecedentes_ok:
         c.estado = EstadoConductor.RECHAZADO
-    elif c.licencia_ok:
-        c.estado = EstadoConductor.APROBADO
     else:
-        c.estado = EstadoConductor.PENDIENTE
+        c.estado = EstadoConductor.APROBADO
     return c

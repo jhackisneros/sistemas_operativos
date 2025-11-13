@@ -9,6 +9,7 @@ router = APIRouter()
 repo = Repositorio.instancia()
 spawner = GeneradorAutoConductor(repo)
 
+
 @router.post("/registrar")
 def registrar(
     conductor_id: str,
@@ -33,13 +34,11 @@ def registrar(
     repo.guardar_conductor(c)
 
     if c.estado == EstadoConductor.RECHAZADO:
-        return {"estado": "RECHAZADO", "motivo": "Antecedentes penales"}
+        return {"estado": "RECHAZADO", "motivo": "Antecedentes/licencia no válidos"}
 
-    if c.estado == EstadoConductor.APROBADO:
-        t = repo.registrar_taxi(conductor_id, placa, marca, modelo)
-        return {"estado": "APROBADO", "taxi_id": t.id}
+    t = repo.registrar_taxi(conductor_id, placa, marca, modelo)
+    return {"estado": c.estado.name, "taxi_id": t.id}
 
-    return {"estado": "PENDIENTE"}
 
 @router.post("/online")
 def online(conductor_id: str, lat: float, lon: float):
@@ -61,6 +60,7 @@ def online(conductor_id: str, lat: float, lon: float):
     spawner.iniciar(conductor_id)
     return {"estado": "ONLINE", "taxi_id": t.id}
 
+
 @router.post("/offline")
 def offline(conductor_id: str):
     c = repo.obtener_conductor(conductor_id)
@@ -77,6 +77,7 @@ def offline(conductor_id: str):
     spawner.detener(conductor_id)
     return {"estado": "OFFLINE"}
 
+
 @router.post("/iniciar/{viaje_id}")
 def iniciar_viaje(viaje_id: str, conductor_id: str):
     v = repo.obtener_viaje(viaje_id)
@@ -89,6 +90,7 @@ def iniciar_viaje(viaje_id: str, conductor_id: str):
         raise HTTPException(409, "El viaje no está en estado ASIGNADO")
     repo.marcar_inicio_viaje(viaje_id)
     return {"ok": True, "estado": "EN_CURSO"}
+
 
 @router.post("/finalizar/{viaje_id}")
 def finalizar_viaje(viaje_id: str, conductor_id: str):
