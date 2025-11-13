@@ -1,7 +1,37 @@
 [
-  { "id": "RET", "nombre": "Parque de El Retiro", "lat": 40.4153, "lon": -3.6844 },
-  { "id": "BER", "nombre": "Estadio Santiago Bernabéu", "lat": 40.4531, "lon": -3.6883 },
-  { "id": "CDC", "nombre": "Casa de Campo (Lago)", "lat": 40.4170, "lon": -3.7450 },
-  { "id": "MAT", "nombre": "Matadero Madrid", "lat": 40.3910, "lon": -3.6980 },
-  { "id": "T4",  "nombre": "Aeropuerto Adolfo Suárez (T4)", "lat": 40.4920, "lon": -3.5930 }
+  {
+    "id": "RET",
+    "nombre": "Parque del Retiro",
+    "descripcion": "Parque emblemático de Madrid, zona centro-este.",
+    "lat": 40.415260,
+    "lon": -3.684419
+  },
+  {
+    "id": "BER",
+    "nombre": "Estadio Santiago Bernabéu",
+    "descripcion": "Estadio del Real Madrid, en el Paseo de la Castellana.",
+    "lat": 40.453060,
+    "lon": -3.688344
+  },
+  {
+    "id": "CDC",
+    "nombre": "Casa de Campo",
+    "descripcion": "Gran parque al oeste de Madrid, zona de ocio y naturaleza.",
+    "lat": 40.417990,
+    "lon": -3.753180
+  },
+  {
+    "id": "MAT",
+    "nombre": "Matadero Madrid",
+    "descripcion": "Centro cultural en la zona de Legazpi, junto al río Manzanares.",
+    "lat": 40.391640,
+    "lon": -3.698250
+  },
+  {
+    "id": "T4",
+    "nombre": "Aeropuerto Adolfo Suárez Madrid-Barajas T4",
+    "descripcion": "Terminal T4 del aeropuerto de Madrid.",
+    "lat": 40.491840,
+    "lon": -3.593350
+  }
 ]
